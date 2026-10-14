@@ -1,0 +1,75 @@
+name: Build iOS (unsigned)
+
+# CDash 自编译打包：无签名 IPA，用户用自己的开发者证书签名后侧载。
+# 免费开源（AGPL-3.0），无内购。
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: "Bundle ID（侧载用，需全局唯一）"
+        required: false
+        default: "com.ayin.clashdash"
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then echo "No Xcode found:"; ls /Applications | grep -i xcode; exit 1; fi
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Patch identifiers
+        env:
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+        run: |
+          set -e
+          PROJ="Clash Dash.xcodeproj/project.pbxproj"
+
+          # Bundle ID：ym.si.clashdash -> 用户自己的
+          sed -i '' "s/ym\.si\.clashdash/${BUNDLE_ID}/g" "$PROJ"
+
+          # App Group：entitlements + Swift 硬编码，保持一致
+          find . \( -name "*.entitlements" -o -name "*.swift" \) -not -path "./.git/*" \
+            -exec sed -i '' "s/group\.ym\.si\.clashdash/group.${BUNDLE_ID}/g" {} +
+
+          echo "--- verify ---"
+          grep -o 'PRODUCT_BUNDLE_IDENTIFIER = [^;]*' "$PROJ" | sort -u
+          grep -rn "group\.${BUNDLE_ID}" --include="*.swift" . | grep -v Tests | head -3
+
+      - name: Build (unsigned)
+        run: |
+          set -e
+          xcodebuild \
+            -project "Clash Dash.xcodeproj" \
+            -scheme "Clash Dash" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package IPA
+        run: |
+          set -e
+          APP=$(find "$RUNNER_TEMP/dd/Build/Products/Release-iphoneos" -maxdepth 1 -name "*.app" | head -1)
+          echo "App: $APP"
+          [ -z "$APP" ] && exit 1
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+          rm -f CDash-unsigned.ipa
+          zip -r -y CDash-unsigned.ipa Payload
+          ls -lh CDash-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: CDash-unsigned
+          path: CDash-unsigned.ipa
+          retention-days: 14
