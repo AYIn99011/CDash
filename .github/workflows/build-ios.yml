@@ -23,8 +23,8 @@ jobs:
         run: |
           echo "Available Xcodes:"
           ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V
-          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | grep -v "Xcode_26\.6" | tail -1)
-          if [ -z "$XC" ]; then echo "No Xcode < 26.6 found"; exit 1; fi
+          XC=$(ls -d /Applications/Xcode_26.2*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XC" ]; then echo "No Xcode 26.2 found"; ls -d /Applications/Xcode_*.app; exit 1; fi
           echo "Using $XC"
           sudo xcode-select -s "$XC"
           xcodebuild -version
