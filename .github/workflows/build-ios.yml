@@ -53,6 +53,7 @@ jobs:
             -destination "generic/platform=iOS" \
             -derivedDataPath "$RUNNER_TEMP/dd" \
             CODE_SIGNING_ALLOWED=NO \
+            'OTHER_SWIFT_FLAGS=$(inherited) -Xfrontend -disable-sil-ownership-verifier' \
             build
 
       - name: Package IPA
