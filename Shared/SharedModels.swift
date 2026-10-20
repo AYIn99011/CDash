@@ -17,10 +17,8 @@ public class SharedDataManager {
     }
     
     private init() {
-        guard let userDefaults = UserDefaults(suiteName: appGroupId) else {
-            fatalError("无法访问 App Group")
-        }
-        self.userDefaults = userDefaults
+        // 侧载签名下 App Group 可能不可用，回退到标准存储，避免 fatalError 闪退
+        self.userDefaults = UserDefaults(suiteName: appGroupId) ?? .standard
     }
     
     public func saveClashStatus(
